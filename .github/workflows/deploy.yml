@@ -1,0 +1,72 @@
+name: Linode K8s Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy & Sync WordPress
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Authenticate with Linode Cluster
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_DATA }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Deploy Infrastructure (Issuer, DB, WP, Ingress)
+        run: |
+          kubectl apply -f issuer.yaml
+          kubectl apply -k ./
+          kubectl apply -f ingress.yaml
+
+      - name: Wait for WordPress Pod to become Ready
+        run: |
+          echo "Waiting for WordPress container to start..."
+          kubectl wait --for=condition=ready pod -l app=wordpress --timeout=120s
+
+      - name: Run Content Automation (Sync Live Site)
+        run: |
+          # 1. Dynamically find the exact name of the WordPress pod
+          POD_NAME=$(kubectl get pods -l app=wordpress -o jsonpath="{.items[0].metadata.name}")
+          
+          echo "Executing WP-CLI commands inside $POD_NAME..."
+
+          # 2. Execute the theme installation and PHP sync script inside the pod
+          kubectl exec $POD_NAME -- bash -c "
+            wp theme install kadence --activate --allow-root
+            wp plugin install kadence-blocks --activate --allow-root
+            
+            wp eval '
+              echo \"Fetching live site layout...\n\";
+              \$response = wp_remote_get(\"https://www.redfoxcohomes.com/wp-json/wp/v2/pages?slug=home\");
+              
+              if (!is_wp_error(\$response)) {
+                  \$body = json_decode(wp_remote_retrieve_body(\$response), true);
+                  
+                  if (!empty(\$body) && isset(\$body[0][\"content\"][\"raw\"])) {
+                      \$live_content = \$body[0][\"content\"][\"raw\"];
+                      \$local_home = get_page_by_path(\"home\");
+                      
+                      if (\$local_home) {
+                          wp_update_post([
+                              \"ID\"           => \$local_home->ID, 
+                              \"post_content\" => \$live_content
+                          ]);
+                          echo \"Success! Live homepage synced.\n\";
+                      }
+                  }
+              }
+            ' --allow-root
+          "
