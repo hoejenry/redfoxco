@@ -10,10 +10,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - demo.redfoxcohomes.com
+    - www.redfoxcohomes.com
     secretName: wordpress-tls-secret # Cert-Manager will safely store the cert here
   rules:
-  - host: demo.redfoxcohomes.com
+  - host: www.redfoxcohomes.com
     http:
       paths:
       - path: /
