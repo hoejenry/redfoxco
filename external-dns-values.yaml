@@ -1,0 +1,8 @@
+provider: linode
+env:
+  - name: LINODE_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: linode-dns
+        key: linode_api_token
+policy: sync # This allows it to both create and delete DNS records
