@@ -3,6 +3,10 @@ kind: Kustomization
 resources:
   - https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/application/wordpress/mysql-deployment.yaml
   - https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/application/wordpress/wordpress-deployment.yaml
+patches:
+  - path: patch-wordpress-resources.yaml
+  - path: patch-mysql-resources.yaml
+
 images:
   - name: wordpress
     newName: wordpress
