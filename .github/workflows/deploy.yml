@@ -29,9 +29,11 @@ jobs:
           chmod 600 ~/.kube/config
 
       - name: Create mysql-pass secret
+        env:
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
         run: |
           kubectl create secret generic mysql-pass \
-            --from-literal=password="${{ secrets.MYSQL_PASSWORD }}" \
+            --from-literal=password="$MYSQL_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy Infrastructure (Issuer, DB, WP, Ingress)
